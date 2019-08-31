@@ -1,23 +1,29 @@
 package com.dv.windows;
 
+import com.dv.crypto.Crypto;
+import com.dv.tools.FileIO;
 import com.lanterna.TerminalPosition;
 import com.lanterna.TerminalSize;
+import com.lanterna.bundle.LanternaThemes;
 import com.lanterna.gui2.*;
-import com.lanterna.gui2.dialogs.FileDialogBuilder;
+import com.lanterna.gui2.dialogs.*;
 import com.lanterna.input.KeyStroke;
 import com.lanterna.input.KeyType;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MainScreen extends BasicWindow {
 
     private WindowBasedTextGUI gui;
     private TextBox outputbox;
-    private Label currentFilePath;
+    private Label textData;
+    private File openedFile;
 
     public MainScreen(WindowBasedTextGUI gui, TerminalSize size) {
         super("");
@@ -25,11 +31,10 @@ public class MainScreen extends BasicWindow {
 
         setHints(Collections.singletonList(Hint.FULL_SCREEN));
 
-        Panel panel = new Panel(new LinearLayout().setSpacing(1));
-
         addWindowListener(new WindowListener() {
             @Override
             public void onResized(Window window, TerminalSize oldSize, TerminalSize newSize) {
+                outputbox.setSize(newSize);
             }
 
             @Override
@@ -39,8 +44,9 @@ public class MainScreen extends BasicWindow {
 
             @Override
             public void onInput(Window basePane, KeyStroke keyStroke, AtomicBoolean deliverEvent) {
+
                 if (keyStroke.getKeyType() == KeyType.Escape)
-                    displayFile();
+                    createMenu().showDialog(gui);
             }
 
             @Override
@@ -48,41 +54,79 @@ public class MainScreen extends BasicWindow {
 
             }
         });
+        outputbox = new TextBox(size);
 
-        currentFilePath = new Label("No path selected");
-        outputbox = new TextBox().setSize(panel.getSize()).setLayoutData(LinearLayout.createLayoutData(LinearLayout.Alignment.Fill));
-        outputbox.addTo(panel);
-
-        panel.addComponent(outputbox);
-        panel.addComponent(currentFilePath);
-
-        setComponent(panel);
+        setComponent(outputbox);
     }
 
     public void displayFile() {
-        File file = new FileDialogBuilder().setTitle("Open File").setActionLabel("Open").build().showDialog(gui);
-        if (file != null) {
+        openedFile = new FileDialogBuilder().setTitle("Open File").setActionLabel("Open").build().showDialog(gui);
+        if (openedFile != null) {
             outputbox.setText("");
-            String data = read(file);
-            currentFilePath.setText(file.getAbsolutePath());
-            outputbox.setText(data);
-        } else {
-            currentFilePath.setText("No path selected");
+            String buffer = new String(Objects.requireNonNull(FileIO.read(openedFile)));
+            outputbox.setText(buffer);
         }
     }
 
-    public String read(File file) {
-        try {
-            FileInputStream fis = new FileInputStream(file);
-            byte[] buffer = new byte[fis.available()];
-            fis.read(buffer);
-            fis.close();
+    private boolean promptEncryptionQuestion() {
+       MessageDialogButton btn = MessageDialog.showMessageDialog(gui, "Encrypt before saving?", "", MessageDialogButton.Yes, MessageDialogButton.No);
+       return btn.equals(MessageDialogButton.Yes);
+    }
 
-            return new String(buffer);
-        } catch (IOException e) {
-            e.printStackTrace();
+    private void encrypt(){
+        if(outputbox.getText().isEmpty()){
+            MessageDialog.showMessageDialog(gui, "No data", "Buffer contains no data to encrypt");
+            return;
         }
 
-        return "Empty File";
+        byte[] buffer = this.outputbox.getText().trim().getBytes();
+        buffer = Crypto.encrypt(buffer);
+        buffer = Crypto.encode(buffer);
+        outputbox.setText(new String(buffer));
+    }
+
+    private void decrypt(){
+        if(outputbox.getText().isEmpty()){
+            MessageDialog.showMessageDialog(gui, "No data", "Buffer contains no data to decrypt");
+            return;
+        }
+
+        byte[] buffer = this.outputbox.getText().trim().getBytes();
+        System.out.println(buffer.length);
+        buffer = Crypto.decode(buffer);
+        buffer = Crypto.decrypt(buffer);
+        outputbox.setText(new String(buffer));
+    }
+
+    private ActionListDialog createMenu(){
+        return new ActionListDialogBuilder().setTitle("Menu")
+                .addAction("Load file...", this::displayFile)
+                .addAction("Save file...", () -> {
+                    byte[] buffer = outputbox.getText().getBytes();
+                    if(openedFile == null)
+                    {
+                        String title = TextInputDialog.showDialog(gui, "File name", "Please enter the file name to save as.", "");
+                        openedFile = new File(title);
+                        try {
+                            openedFile.createNewFile();
+                        } catch (IOException e) {
+                           e.printStackTrace();
+                            return;
+                        }
+                    }
+                    if(promptEncryptionQuestion()){
+                        buffer = Crypto.encode(buffer);
+                        buffer = Crypto.encrypt(buffer);
+                    }
+
+                    FileIO.write(openedFile, buffer);
+                    MessageDialog.showMessageDialog(gui, "Saved!", "File has been saved to " + openedFile);
+                })
+                .addAction("Encrypt", this::encrypt)
+                .addAction("Decrypt", () -> {
+
+                })
+                .addAction("Reset Keys", () -> gui.addWindowAndWait(new LoginScreen(gui)))
+                .addAction("Exit", () -> System.exit(0)).build();
     }
 }

@@ -16,7 +16,6 @@ public class LoginScreen extends BasicWindow {
         super("Login Screen");
 
         setHints(Collections.singletonList(Hint.CENTERED));
-        setTheme(LanternaThemes.getRegisteredTheme("businessmachine"));
 
         Label passLbl = new Label("Pass:");
         Label saltLbl = new Label("Salt: (left blank uses default salt)");

@@ -8,6 +8,7 @@ import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
@@ -21,7 +22,7 @@ import java.util.Collection;
 public class Crypto {
 
     private static SecretKeySpec key;
-    private static byte[] iv = {87, 29, -62, 113, 9, 117, 52, -15, 30, -61, -93, 28, 112, -120, -111, -77};
+    private static String iv = "Vx3CcQl1NPEew6MccIiRsw==";
 
     public static byte[] generateIV() {
         SecureRandom secureRand = new SecureRandom();
@@ -84,30 +85,28 @@ public class Crypto {
         }
     }
 
-    public static boolean encrypt(byte[] src, byte[] dst) {
+    public static byte[] encrypt(byte[] src) {
         try {
             Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-            cipher.init(Cipher.ENCRYPT_MODE, key, new IvParameterSpec(iv));
+            cipher.init(Cipher.ENCRYPT_MODE, key, new IvParameterSpec(decode(iv.getBytes())));
 
-            dst = cipher.doFinal(src);
-            return true;
+            return cipher.doFinal(src);
         } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | InvalidAlgorithmParameterException | IllegalBlockSizeException | BadPaddingException e) {
             e.printStackTrace();
         }
-        return false;
+        return src;
     }
 
-    public static boolean decrypt(byte[] src, byte[] dst) {
+    public static byte[] decrypt(byte[] src) {
         try {
             Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-            cipher.init(Cipher.DECRYPT_MODE, key, new IvParameterSpec(iv));
+            cipher.init(Cipher.DECRYPT_MODE, key, new IvParameterSpec(decode(iv.getBytes())));
 
-            dst = cipher.doFinal(src);
-            return true;
+            return cipher.doFinal(src);
         } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | InvalidAlgorithmParameterException | IllegalBlockSizeException | BadPaddingException e) {
             e.printStackTrace();
         }
-        return false;
+        return src;
     }
 
     public static byte[] encode(byte[] data) {
