@@ -10,9 +10,11 @@ import com.lanterna.gui2.dialogs.*;
 import com.lanterna.input.KeyStroke;
 import com.lanterna.input.KeyType;
 
+import javax.crypto.Cipher;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Objects;
@@ -25,8 +27,10 @@ public class MainScreen extends BasicWindow {
     private Label textData;
     private File openedFile;
 
+    private int iterationCount = 16; // how many times to encrypt or decrypt data
+
     public MainScreen(WindowBasedTextGUI gui, TerminalSize size) {
-        super("");
+        super("Text Editor");
         this.gui = gui;
 
         setHints(Collections.singletonList(Hint.FULL_SCREEN));
@@ -44,7 +48,6 @@ public class MainScreen extends BasicWindow {
 
             @Override
             public void onInput(Window basePane, KeyStroke keyStroke, AtomicBoolean deliverEvent) {
-
                 if (keyStroke.getKeyType() == KeyType.Escape)
                     createMenu().showDialog(gui);
             }
@@ -54,12 +57,12 @@ public class MainScreen extends BasicWindow {
 
             }
         });
-        outputbox = new TextBox(size);
 
+        outputbox = new TextBox(size);
         setComponent(outputbox);
     }
 
-    public void displayFile() {
+    private void displayFile() {
         openedFile = new FileDialogBuilder().setTitle("Open File").setActionLabel("Open").build().showDialog(gui);
         if (openedFile != null) {
             outputbox.setText("");
@@ -73,29 +76,40 @@ public class MainScreen extends BasicWindow {
        return btn.equals(MessageDialogButton.Yes);
     }
 
-    private void encrypt(){
+    private boolean promptOverwriteQuestion(){
+        MessageDialogButton btn = MessageDialog.showMessageDialog(gui, "Overwrite", "Should overwrite current file?", MessageDialogButton.Yes, MessageDialogButton.No);
+        return btn.equals(MessageDialogButton.No);
+    }
+
+    private void doTask(int opmode){
         if(outputbox.getText().isEmpty()){
-            MessageDialog.showMessageDialog(gui, "No data", "Buffer contains no data to encrypt");
+            MessageDialog.showMessageDialog(gui, "No data", "Buffer contains no data");
             return;
         }
 
-        byte[] buffer = this.outputbox.getText().trim().getBytes();
-        buffer = Crypto.encrypt(buffer);
-        buffer = Crypto.encode(buffer);
+        byte[] buffer = this.outputbox.getText().getBytes();
+        if(opmode == Cipher.ENCRYPT_MODE)
+        {
+            for(int i = 0; i < iterationCount; i++)
+                buffer = Crypto.mess(opmode, buffer);
+            buffer = Crypto.encode(buffer);
+        } else if(opmode == Cipher.DECRYPT_MODE) {
+            buffer = Crypto.decode(buffer);
+            for(int i = 0; i < iterationCount; i++)
+                buffer = Crypto.mess(opmode, buffer);
+        }
+
         outputbox.setText(new String(buffer));
     }
 
-    private void decrypt(){
-        if(outputbox.getText().isEmpty()){
-            MessageDialog.showMessageDialog(gui, "No data", "Buffer contains no data to decrypt");
-            return;
+    private void createFile(){
+        String title = TextInputDialog.showDialog(gui, "File name", "Please enter the file name to save as.", "");
+        openedFile = new File(title);
+        try {
+            openedFile.createNewFile();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-
-        byte[] buffer = this.outputbox.getText().trim().getBytes();
-        System.out.println(buffer.length);
-        buffer = Crypto.decode(buffer);
-        buffer = Crypto.decrypt(buffer);
-        outputbox.setText(new String(buffer));
     }
 
     private ActionListDialog createMenu(){
@@ -105,28 +119,40 @@ public class MainScreen extends BasicWindow {
                     byte[] buffer = outputbox.getText().getBytes();
                     if(openedFile == null)
                     {
-                        String title = TextInputDialog.showDialog(gui, "File name", "Please enter the file name to save as.", "");
-                        openedFile = new File(title);
-                        try {
-                            openedFile.createNewFile();
-                        } catch (IOException e) {
-                           e.printStackTrace();
-                            return;
-                        }
+                        createFile();
+                    } else {
+                        if(promptOverwriteQuestion())
+                            createFile();
                     }
                     if(promptEncryptionQuestion()){
+                        for(int i = 0; i < iterationCount; i++)
+                            buffer = Crypto.mess(Cipher.ENCRYPT_MODE, buffer);
                         buffer = Crypto.encode(buffer);
-                        buffer = Crypto.encrypt(buffer);
                     }
 
                     FileIO.write(openedFile, buffer);
                     MessageDialog.showMessageDialog(gui, "Saved!", "File has been saved to " + openedFile);
                 })
-                .addAction("Encrypt", this::encrypt)
-                .addAction("Decrypt", () -> {
+                .addAction("Encrypt", () -> doTask(Cipher.ENCRYPT_MODE))
+                .addAction("Decrypt", () -> doTask(Cipher.DECRYPT_MODE))
+                .addAction("Settings", this::createSettings)
+                .addAction("Exit", () -> System.exit(0)).build();
+    }
 
+    private void createSettings(){
+        new ActionListDialogBuilder().setTitle("Settings")
+                .addAction("Change encryption/decryption loop", () -> {
+                    BigInteger temp = TextInputDialog.showNumberDialog(gui, "Iteration", "Enter iteration amount", "16");
+                    iterationCount = temp != null ? temp.intValue() : 16;
+                    if(temp == null)
+                        MessageDialog.showMessageDialog(gui, "ERR", "Failure getting iteration amount");
+                    else
+                    {
+                        MessageDialog.showMessageDialog(gui, "INFO", "Iteration count set!");
+                        iterationCount = temp.intValue();
+                    }
                 })
                 .addAction("Reset Keys", () -> gui.addWindowAndWait(new LoginScreen(gui)))
-                .addAction("Exit", () -> System.exit(0)).build();
+                .build().showDialog(gui);
     }
 }

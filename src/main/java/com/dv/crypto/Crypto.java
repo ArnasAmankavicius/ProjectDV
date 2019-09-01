@@ -85,22 +85,10 @@ public class Crypto {
         }
     }
 
-    public static byte[] encrypt(byte[] src) {
+    public static byte[] mess(int opmode,byte[] src) {
         try {
             Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-            cipher.init(Cipher.ENCRYPT_MODE, key, new IvParameterSpec(decode(iv.getBytes())));
-
-            return cipher.doFinal(src);
-        } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | InvalidAlgorithmParameterException | IllegalBlockSizeException | BadPaddingException e) {
-            e.printStackTrace();
-        }
-        return src;
-    }
-
-    public static byte[] decrypt(byte[] src) {
-        try {
-            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-            cipher.init(Cipher.DECRYPT_MODE, key, new IvParameterSpec(decode(iv.getBytes())));
+            cipher.init(opmode, key, new IvParameterSpec(decode(iv.getBytes())));
 
             return cipher.doFinal(src);
         } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | InvalidAlgorithmParameterException | IllegalBlockSizeException | BadPaddingException e) {
