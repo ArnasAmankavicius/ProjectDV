@@ -35,6 +35,7 @@ byte[] buffer = Crypto.mess(Cipher.DECRYPT_MODE, byteArr);
 
 By default, data is encrypted 16 times. This can be changed in the applications setting menu under 
 **"Change encryption/decryption iteration"** menu option.
+![Iteration count](https://github.com/ArnasAmankavicius/ProjectDV/blob/master/ProjectDV%20Images/Change%20iteration%20count.png)
 Encryption loop:
 ```java
 for(int i = 0; i < iterationCount; i++)
