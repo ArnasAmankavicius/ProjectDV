@@ -141,7 +141,7 @@ public class MainScreen extends BasicWindow {
 
     private void createSettings(){
         new ActionListDialogBuilder().setTitle("Settings")
-                .addAction("Change encryption/decryption loop", () -> {
+                .addAction("Change iteration count", () -> {
                     BigInteger temp = TextInputDialog.showNumberDialog(gui, "Iteration", "Enter iteration amount", "16");
                     iterationCount = temp != null ? temp.intValue() : 16;
                     if(temp == null)
