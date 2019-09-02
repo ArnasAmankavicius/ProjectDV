@@ -4,7 +4,6 @@ import com.dv.crypto.Crypto;
 import com.dv.tools.FileIO;
 import com.lanterna.TerminalPosition;
 import com.lanterna.TerminalSize;
-import com.lanterna.bundle.LanternaThemes;
 import com.lanterna.gui2.*;
 import com.lanterna.gui2.dialogs.*;
 import com.lanterna.input.KeyStroke;
@@ -12,10 +11,8 @@ import com.lanterna.input.KeyType;
 
 import javax.crypto.Cipher;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Collections;
 import java.util.Date;
@@ -26,7 +23,6 @@ public class MainScreen extends BasicWindow {
 
     private WindowBasedTextGUI gui;
     private TextBox outputbox;
-    private Label textData;
     private File openedFile;
 
     private int iterationCount = 16; // how many times to encrypt or decrypt data
@@ -104,25 +100,31 @@ public class MainScreen extends BasicWindow {
         if(opmode == Cipher.ENCRYPT_MODE)
         {
             for(int i = 0; i < iterationCount; i++)
-                buffer = Crypto.mess(opmode, buffer);
+                buffer = Crypto.mess(opmode, buffer, gui);
             buffer = Crypto.encode(buffer);
         } else if(opmode == Cipher.DECRYPT_MODE) {
             buffer = Crypto.decode(buffer);
             for(int i = 0; i < iterationCount; i++)
-                buffer = Crypto.mess(opmode, buffer);
+                buffer = Crypto.mess(opmode, buffer, gui);
         }
 
         outputbox.setText(new String(buffer));
     }
 
+    @SuppressWarnings("ResultOfMethodCallIgnored")
     private void createFile(){
         String title = TextInputDialog.showDialog(gui, "File name", "Please enter the file name to save as.", "");
-        File dir = new DirectoryDialogBuilder().setTitle("Select a directory").setDescription("Chose a location to save the file to").setActionLabel("Select").build().showDialog(gui);
-        openedFile = new File(dir, title);
-        try {
-            openedFile.createNewFile();
-        } catch (IOException e) {
-            e.printStackTrace();
+        if(title != null && !title.isEmpty())
+        {
+            File dir = new DirectoryDialogBuilder().setTitle("Select a directory").setDescription("Chose a location to save the file to").setActionLabel("Select").build().showDialog(gui);
+            openedFile = new File(dir, title);
+            try
+            {
+                openedFile.createNewFile();
+            } catch (IOException e)
+            {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -136,20 +138,26 @@ public class MainScreen extends BasicWindow {
             if(promptOverwriteQuestion())
                 createFile();
         }
-        if(!encryptByDefault) {
-            encrypt = promptEncryptionQuestion();
-        } else
-            encrypt = true;
+        if(openedFile != null)
+        {
+            if (!encryptByDefault)
+            {
+                encrypt = promptEncryptionQuestion();
+            } else
+                encrypt = true;
 
-        if(encrypt) {
-            for (int i = 0; i < iterationCount; i++)
-                buffer = Crypto.mess(Cipher.ENCRYPT_MODE, buffer);
-            buffer = Crypto.encode(buffer);
+            if (encrypt)
+            {
+                for (int i = 0; i < iterationCount; i++)
+                    buffer = Crypto.mess(Cipher.ENCRYPT_MODE, buffer, gui);
+                buffer = Crypto.encode(buffer);
+            }
+            FileIO.write(openedFile, buffer);
+            MessageDialog.showMessageDialog(gui, "Saved!", "File has been saved to " + openedFile);
         }
-        FileIO.write(openedFile, buffer);
-        MessageDialog.showMessageDialog(gui, "Saved!", "File has been saved to " + openedFile);
     }
 
+    @org.jetbrains.annotations.NotNull
     private String getTimeStamp(){
         SimpleDateFormat sdf = new SimpleDateFormat("## YYYY/dd/MM | HH:mm:ss.SS ##");
         return sdf.format(new Date());
@@ -167,31 +175,37 @@ public class MainScreen extends BasicWindow {
                 })
                 .addAction("Load file...", this::displayFile)
                 .addAction("Save file...", this::saveFile)
-                .addAction("Encrypt", () -> doTask(Cipher.ENCRYPT_MODE))
+                .addAction("Encrypt buffer", () -> doTask(Cipher.ENCRYPT_MODE))
                 .addAction("Encrypt file...", () -> {
-                    MessageDialog.showMessageDialog(gui, "Info","Encrypting...");
                     File file = FileIO.getFile(gui);
-                    byte[] buffer = FileIO.read(file);
-                    for(int i = 0; i < iterationCount; i++)
-                        buffer = Crypto.mess(Cipher.ENCRYPT_MODE, buffer);
+                    if(file != null)
+                    {
+                        byte[] buffer = FileIO.read(file);
+                        MessageDialog.showMessageDialog(gui, "Info", "Encrypting...");
+                        for (int i = 0; i < iterationCount; i++)
+                            buffer = Crypto.mess(Cipher.ENCRYPT_MODE, buffer, gui);
 
-                    buffer = Crypto.encode(buffer);
-                    FileIO.write(file, buffer);
+                        buffer = Crypto.encode(buffer);
+                        FileIO.write(file, buffer);
 
-                    MessageDialog.showMessageDialog(gui, "Encrypted!", "Encryption completed");
+                        MessageDialog.showMessageDialog(gui, "Encrypted!", "Encryption completed");
+                    }
                 })
-                .addAction("Decrypt", () -> doTask(Cipher.DECRYPT_MODE))
+                .addAction("Decrypt buffer", () -> doTask(Cipher.DECRYPT_MODE))
                 .addAction("Decrypt file...", () -> {
-                    MessageDialog.showMessageDialog(gui, "Info","Decrypting...");
                     File file = FileIO.getFile(gui);
-                    byte[] buffer = FileIO.read(file);
-                    buffer = Crypto.decode(buffer);
-                    for(int i = 0; i < iterationCount; i++)
-                        buffer = Crypto.mess(Cipher.DECRYPT_MODE, buffer);
+                    if(file != null)
+                    {
+                        byte[] buffer = FileIO.read(file);
+                        MessageDialog.showMessageDialog(gui, "Info", "Decrypting...");
+                        buffer = Crypto.decode(buffer);
+                        for (int i = 0; i < iterationCount; i++)
+                            buffer = Crypto.mess(Cipher.DECRYPT_MODE, buffer, gui);
 
-                    FileIO.write(file, buffer);
+                        FileIO.write(file, buffer);
 
-                    MessageDialog.showMessageDialog(gui, "Decrypted!", "Decryption completed");
+                        MessageDialog.showMessageDialog(gui, "Decrypted!", "Decryption completed");
+                    }
                 })
                 .addAction("Settings", this::createSettings)
                 .addAction("Exit", () -> System.exit(0)).build();

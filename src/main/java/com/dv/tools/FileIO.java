@@ -27,22 +27,29 @@ public class FileIO {
     @SuppressWarnings("ResultOfMethodCallIgnored")
     public static void write(File file, byte[] data)
     {
-        if(!file.exists()) {
-            try {
-                file.createNewFile();
-            } catch (IOException e) {
+        if(file != null)
+        {
+            if (!file.exists())
+            {
+                try
+                {
+                    file.createNewFile();
+                } catch (IOException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+
+            try
+            {
+                FileOutputStream fos = new FileOutputStream(file);
+                fos.write(data);
+                fos.close();
+            } catch (IOException e)
+            {
                 e.printStackTrace();
             }
         }
-
-        try {
-            FileOutputStream fos = new FileOutputStream(file);
-            fos.write(data);
-            fos.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
     }
 
     public static File getFile(WindowBasedTextGUI gui){

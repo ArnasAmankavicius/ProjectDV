@@ -2,7 +2,6 @@ package com.dv.windows;
 
 import com.dv.crypto.Crypto;
 import com.lanterna.TerminalSize;
-import com.lanterna.bundle.LanternaThemes;
 import com.lanterna.gui2.*;
 import com.lanterna.gui2.dialogs.MessageDialog;
 
