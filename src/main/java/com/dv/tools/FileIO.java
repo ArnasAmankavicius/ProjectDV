@@ -1,5 +1,9 @@
 package com.dv.tools;
 
+import com.lanterna.gui2.WindowBasedTextGUI;
+import com.lanterna.gui2.dialogs.FileDialog;
+import com.lanterna.gui2.dialogs.FileDialogBuilder;
+
 import java.io.*;
 
 public class FileIO {
@@ -39,5 +43,9 @@ public class FileIO {
             e.printStackTrace();
         }
 
+    }
+
+    public static File getFile(WindowBasedTextGUI gui){
+        return new FileDialogBuilder().setTitle("Select a file").setDescription("Select a file to encrypt").setActionLabel("Select").build().showDialog(gui);
     }
 }

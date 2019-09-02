@@ -16,7 +16,9 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
 import java.util.Collections;
+import java.util.Date;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -28,6 +30,7 @@ public class MainScreen extends BasicWindow {
     private File openedFile;
 
     private int iterationCount = 16; // how many times to encrypt or decrypt data
+    private boolean encryptByDefault = true;
 
     public MainScreen(WindowBasedTextGUI gui, TerminalSize size) {
         super("Text Editor");
@@ -50,6 +53,11 @@ public class MainScreen extends BasicWindow {
             public void onInput(Window basePane, KeyStroke keyStroke, AtomicBoolean deliverEvent) {
                 if (keyStroke.getKeyType() == KeyType.Escape)
                     createMenu().showDialog(gui);
+
+                if(keyStroke.isCtrlDown() && keyStroke.getCharacter() == 't')
+                {
+                    outputbox.addLine(getTimeStamp());
+                }
             }
 
             @Override
@@ -63,7 +71,7 @@ public class MainScreen extends BasicWindow {
     }
 
     private void displayFile() {
-        openedFile = new FileDialogBuilder().setTitle("Open File").setActionLabel("Open").build().showDialog(gui);
+        openedFile = FileIO.getFile(gui);
         if (openedFile != null) {
             outputbox.setText("");
             String buffer = new String(Objects.requireNonNull(FileIO.read(openedFile)));
@@ -79,6 +87,11 @@ public class MainScreen extends BasicWindow {
     private boolean promptOverwriteQuestion(){
         MessageDialogButton btn = MessageDialog.showMessageDialog(gui, "Overwrite", "Should overwrite current file?", MessageDialogButton.Yes, MessageDialogButton.No);
         return btn.equals(MessageDialogButton.No);
+    }
+
+    private boolean promptSaveQuestion(){
+        MessageDialogButton btn = MessageDialog.showMessageDialog(gui, "Save", "Do you wish to save the current file?", MessageDialogButton.Yes, MessageDialogButton.No);
+        return btn.equals(MessageDialogButton.Yes);
     }
 
     private void doTask(int opmode){
@@ -104,7 +117,8 @@ public class MainScreen extends BasicWindow {
 
     private void createFile(){
         String title = TextInputDialog.showDialog(gui, "File name", "Please enter the file name to save as.", "");
-        openedFile = new File(title);
+        File dir = new DirectoryDialogBuilder().setTitle("Select a directory").setDescription("Chose a location to save the file to").setActionLabel("Select").build().showDialog(gui);
+        openedFile = new File(dir, title);
         try {
             openedFile.createNewFile();
         } catch (IOException e) {
@@ -112,29 +126,73 @@ public class MainScreen extends BasicWindow {
         }
     }
 
+    private void saveFile(){
+        byte[] buffer = outputbox.getText().getBytes();
+        boolean encrypt;
+        if(openedFile == null)
+        {
+            createFile();
+        } else {
+            if(promptOverwriteQuestion())
+                createFile();
+        }
+        if(!encryptByDefault) {
+            encrypt = promptEncryptionQuestion();
+        } else
+            encrypt = true;
+
+        if(encrypt) {
+            for (int i = 0; i < iterationCount; i++)
+                buffer = Crypto.mess(Cipher.ENCRYPT_MODE, buffer);
+            buffer = Crypto.encode(buffer);
+        }
+        FileIO.write(openedFile, buffer);
+        MessageDialog.showMessageDialog(gui, "Saved!", "File has been saved to " + openedFile);
+    }
+
+    private String getTimeStamp(){
+        SimpleDateFormat sdf = new SimpleDateFormat("## YYYY/dd/MM | HH:mm:ss.SS ##");
+        return sdf.format(new Date());
+    }
+
     private ActionListDialog createMenu(){
         return new ActionListDialogBuilder().setTitle("Menu")
-                .addAction("Load file...", this::displayFile)
-                .addAction("Save file...", () -> {
-                    byte[] buffer = outputbox.getText().getBytes();
-                    if(openedFile == null)
+                .addAction("New File...", () -> {
+                    if(!outputbox.getText().isEmpty())
                     {
-                        createFile();
-                    } else {
-                        if(promptOverwriteQuestion())
-                            createFile();
+                        if(promptSaveQuestion())
+                            saveFile();
+                        outputbox.setText("");
                     }
-                    if(promptEncryptionQuestion()){
-                        for(int i = 0; i < iterationCount; i++)
-                            buffer = Crypto.mess(Cipher.ENCRYPT_MODE, buffer);
-                        buffer = Crypto.encode(buffer);
-                    }
-
-                    FileIO.write(openedFile, buffer);
-                    MessageDialog.showMessageDialog(gui, "Saved!", "File has been saved to " + openedFile);
                 })
+                .addAction("Load file...", this::displayFile)
+                .addAction("Save file...", this::saveFile)
                 .addAction("Encrypt", () -> doTask(Cipher.ENCRYPT_MODE))
+                .addAction("Encrypt file...", () -> {
+                    MessageDialog.showMessageDialog(gui, "Info","Encrypting...");
+                    File file = FileIO.getFile(gui);
+                    byte[] buffer = FileIO.read(file);
+                    for(int i = 0; i < iterationCount; i++)
+                        buffer = Crypto.mess(Cipher.ENCRYPT_MODE, buffer);
+
+                    buffer = Crypto.encode(buffer);
+                    FileIO.write(file, buffer);
+
+                    MessageDialog.showMessageDialog(gui, "Encrypted!", "Encryption completed");
+                })
                 .addAction("Decrypt", () -> doTask(Cipher.DECRYPT_MODE))
+                .addAction("Decrypt file...", () -> {
+                    MessageDialog.showMessageDialog(gui, "Info","Decrypting...");
+                    File file = FileIO.getFile(gui);
+                    byte[] buffer = FileIO.read(file);
+                    buffer = Crypto.decode(buffer);
+                    for(int i = 0; i < iterationCount; i++)
+                        buffer = Crypto.mess(Cipher.DECRYPT_MODE, buffer);
+
+                    FileIO.write(file, buffer);
+
+                    MessageDialog.showMessageDialog(gui, "Decrypted!", "Decryption completed");
+                })
                 .addAction("Settings", this::createSettings)
                 .addAction("Exit", () -> System.exit(0)).build();
     }
@@ -151,6 +209,13 @@ public class MainScreen extends BasicWindow {
                         MessageDialog.showMessageDialog(gui, "INFO", "Iteration count set!");
                         iterationCount = temp.intValue();
                     }
+                })
+                .addAction(String.format("Encrypt on save = '%1$s'", encryptByDefault ? "on" : "off"), () -> {
+                    encryptByDefault = !encryptByDefault;
+                    if(encryptByDefault)
+                        MessageDialog.showMessageDialog(gui, "INFO", "Files will be encrypted by default when saved.");
+                    else
+                        MessageDialog.showMessageDialog(gui, "INFO", "Files will not be encrypted by default when saved.");
                 })
                 .addAction("Reset Keys", () -> gui.addWindowAndWait(new LoginScreen(gui)))
                 .build().showDialog(gui);
