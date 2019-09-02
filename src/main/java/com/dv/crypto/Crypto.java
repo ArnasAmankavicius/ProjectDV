@@ -22,7 +22,7 @@ import java.util.Collection;
 public class Crypto {
 
     private static SecretKeySpec key;
-    private static String iv = "Vx3CcQl1NPEew6MccIiRsw==";
+    private static String iv = "UseGenerateIV to set this value to make it more secure";
 
     public static byte[] generateIV() {
         SecureRandom secureRand = new SecureRandom();
